@@ -14,18 +14,25 @@ const db = admin.firestore();
 
 exports.handler = async function () {
   try {
-    const snapshot = await db.collection("movies").get();
+    const snapshot = await db
+      .collection("artifacts")
+      .doc("my-movie-app-v1")
+      .collection("public")
+      .doc("data")
+      .collection("movies")
+      .get();
 
     const movies = snapshot.docs.map((doc) => {
       const data = doc.data();
 
       return {
         id: doc.id,
-        title: data.title ?? "",
-        rating: data.rating ?? null,
-        oneLine: data.review ?? "",
-        review: data.detailedReview ?? "",
-       
+        title: data.title ?? data.name ?? "",
+        rating: data.rating ?? data.score ?? null,
+        oneLine: data.oneLine ?? data.shortReview ?? data.comment ?? "",
+        review: data.review ?? data.detailReview ?? "",
+        director: data.director ?? "",
+        year: data.year ?? null,
       };
     });
 
