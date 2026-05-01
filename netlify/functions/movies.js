@@ -29,10 +29,8 @@ exports.handler = async function () {
         id: doc.id,
         title: data.title ?? data.name ?? "",
         rating: data.rating ?? data.score ?? null,
-        oneLine: data.oneLine ?? data.shortReview ?? data.comment ?? "",
-        review: data.review ?? data.detailReview ?? "",
-        director: data.director ?? "",
-        year: data.year ?? null,
+        oneLine: data.review ?? data.shortReview ?? data.comment ?? "",
+        detailedreview: data.review ?? data.detailedReview ?? "",
       };
     });
 
