@@ -30,7 +30,7 @@ exports.handler = async function () {
         title: data.title ?? data.name ?? "",
         rating: data.rating ?? data.score ?? null,
         oneLine: data.review ?? data.shortReview ?? data.comment ?? "",
-        detailedreview: data.review ?? data.detailedReview ?? "",
+        detailedreview: data.review11 ?? data.detailedReview ?? "",
       };
     });
 
