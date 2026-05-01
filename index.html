@@ -62,9 +62,6 @@
             { title: "헤어질 결심", rating: 5.0 }, { title: "애국청년 변희재", rating: 2.5 }
         ];
 
-        // --- 컴포넌트들 (ReviewInput, PasswordModal, DetailModal 등 위와 동일하게 구성) ---
-        // (지면 관계상 핵심 로직 위주로 구성하며 위 React 코드의 모든 기능을 포함함)
-
         const IconBox = ({ children, className = "" }) => (
             <div className={`inline-flex items-center justify-center ${className}`}>{children}</div>
         );
@@ -159,6 +156,30 @@
             );
         };
 
+        // --- 별점 선택 컴포넌트 (신규) ---
+        const StarRatingInput = ({ value, onChange }) => {
+            const [hover, setHover] = useState(0);
+            return (
+                <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                            key={star}
+                            type="button"
+                            onClick={() => onChange(star)}
+                            onMouseEnter={() => setHover(star)}
+                            onMouseLeave={() => setHover(0)}
+                            className={`text-2xl transition-all ${
+                                star <= (hover || value) ? "text-yellow-400 scale-110" : "text-slate-200"
+                            }`}
+                        >
+                            ★
+                        </button>
+                    ))}
+                    <span className="ml-2 text-sm font-black text-slate-400">{value.toFixed(1)}</span>
+                </div>
+            );
+        };
+
         const App = () => {
             const [user, setUser] = useState(null);
             const [movies, setMovies] = useState([]);
@@ -166,7 +187,7 @@
             const [searchTerm, setSearchTerm] = useState("");
             const [sortOrder, setSortOrder] = useState('desc');
             const [newTitle, setNewTitle] = useState("");
-            const [newRating, setNewRating] = useState(3.0);
+            const [newRating, setNewRating] = useState(5.0);
             const [showAddForm, setShowAddForm] = useState(false);
             const [selectedMovieId, setSelectedMovieId] = useState(null);
             const [passwordAction, setPasswordAction] = useState(null);
@@ -217,7 +238,7 @@
                 if (!newTitle.trim()) return;
                 const docId = `movie_${Date.now()}`;
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', docId), { title: newTitle.trim(), rating: parseFloat(newRating), review: "", detailedReview: "", createdAt: Date.now() });
-                setNewTitle(""); setNewRating(3.0); setShowAddForm(false);
+                setNewTitle(""); setNewRating(5.0); setShowAddForm(false);
             };
 
             const handleDeleteMovie = (id) => setPasswordAction(() => async () => {
@@ -242,11 +263,14 @@
                     <RatingBarChart movies={movies} />
 
                     {showAddForm && (
-                        <div className="bg-white p-6 rounded-2xl shadow-xl mb-8">
-                            <form onSubmit={handleAddMovie} className="flex gap-4">
-                                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="제목" className="flex-1 p-3 bg-slate-50 rounded-xl outline-none" />
-                                <input type="range" min="0.5" max="5" step="0.5" value={newRating} onChange={e => setNewRating(e.target.value)} />
-                                <button type="submit" className="bg-slate-800 text-white px-4 py-2 rounded-xl">추가</button>
+                        <div className="bg-white p-6 rounded-2xl shadow-xl mb-8 border border-indigo-50">
+                            <form onSubmit={handleAddMovie} className="flex flex-col md:flex-row gap-6">
+                                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="영화 제목을 입력하세요" className="flex-1 p-3 bg-slate-50 rounded-xl outline-none border-2 border-transparent focus:border-indigo-100 font-bold" />
+                                <div className="flex flex-col justify-center">
+                                    <span className="text-[10px] font-bold text-slate-400 mb-2 ml-1 uppercase tracking-widest">별점 선택</span>
+                                    <StarRatingInput value={newRating} onChange={setNewRating} />
+                                </div>
+                                <button type="submit" className="bg-slate-800 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">리스트에 추가</button>
                             </form>
                         </div>
                     )}
@@ -258,13 +282,13 @@
 
                     <div className="space-y-4">
                         {filteredMovies.map(movie => (
-                            <div key={movie.id} className="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4 group">
+                            <div key={movie.id} className="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4 group hover:border-indigo-100 transition-all">
                                 <div className="w-1/4">
                                     <h3 className="font-bold truncate">{movie.title}</h3>
                                     <div className="text-yellow-400">★ {Number(movie.rating).toFixed(1)}</div>
                                 </div>
                                 <ReviewInput initialValue={movie.review} onSave={text => handleReviewSave(movie.id, text)} requestPassword={a => setPasswordAction(() => a)} />
-                                <button onClick={() => setPasswordAction(() => () => setSelectedMovieId(movie.id))} className={`px-4 py-2 rounded-xl text-xs font-black border ${movie.detailedReview ? 'bg-indigo-50 text-indigo-600' : 'bg-white text-slate-400'}`}>상세 리뷰</button>
+                                <button onClick={() => setPasswordAction(() => () => setSelectedMovieId(movie.id))} className={`px-4 py-2 rounded-xl text-xs font-black border ${movie.detailedReview ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-white text-slate-400'}`}>상세 리뷰</button>
                                 <button onClick={() => handleDeleteMovie(movie.id)} className="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all text-xl">🗑</button>
                             </div>
                         ))}
