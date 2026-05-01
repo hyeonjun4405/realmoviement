@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나만의 영화 보관함</title>
+    <!-- 라이브러리 불러오기 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // --- [중요] 여기에 본인의 Firebase Config를 넣으세요 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTKg0AAUyJ6EBMyhGGN7EKgJ8gCJ3F5Dc",
+            authDomain: "mymovieratings-3f52f.firebaseapp.com",
+            projectId: "mymovieratings-3f52f",
+            storageBucket: "mymovieratings-3f52f.firebasestorage.app",
+            messagingSenderId: "799987485947",
+            appId: "1:799987485947:web:481e1fbbd42e7ff5bf345e",
+            measurementId: "G-G33W6M841H" 
+        };
+        // --------------------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = "my-movie-app-v1"; // 고유 앱 ID
+
+        window.FB = { db, auth, appId, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, query, getDocs, writeBatch, signInAnonymously, onAuthStateChanged };
+    </script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+        const { db, auth, appId, collection, doc, setDoc, onSnapshot, updateDoc, deleteDoc, query, getDocs, writeBatch, signInAnonymously, onAuthStateChanged } = window.FB;
+
+        const EDIT_PASSWORD = '909423';
+
+        const initialMoviesData = [
+            { title: "올빼미", rating: 3.0 }, { title: "소공녀", rating: 3.5 }, { title: "완벽한 타인", rating: 3.0 },
+            { title: "이상한 나라의 수학자", rating: 2.5 }, { title: "스파이더맨: 파 프롬 홈", rating: 2.5 }, { title: "마션", rating: 3.5 },
+            { title: "블랙 팬서", rating: 2.0 }, { title: "엑시트", rating: 2.5 }, { title: "안시성", rating: 1.5 },
+            { title: "모가디슈", rating: 3.5 }, { title: "한산: 용의 출현", rating: 2.5 }, { title: "남산의 부장들", rating: 3.5 },
+            { title: "화려한 휴가", rating: 3.0 }, { title: "국제시장", rating: 4.0 }, { title: "히말라야", rating: 2.0 },
+            { title: "신과함께-인과 연", rating: 1.0 }, { title: "택시운전사", rating: 2.5 }, { title: "신과함께-죄와 벌", rating: 1.5 },
+            { title: "1987", rating: 3.5 }, { title: "7번방의 선물", rating: 2.0 }, { title: "어벤져스: 엔드게임", rating: 4.5 },
+            { title: "닥터 스트레인지", rating: 3.0 }, { title: "닥터 스트레인지: 대혼돈의 멀티버스", rating: 1.0 }, { title: "아이언맨", rating: 4.0 },
+            { title: "나쁜 영화", rating: 4.0 }, { title: "악마는 프라다를 입는다 2", rating: 3.5 }, { title: "라라랜드", rating: 4.5 },
+            { title: "세 얼간이", rating: 2.5 }, { title: "서울의 봄", rating: 3.5 }, { title: "노무현입니다", rating: 3.5 },
+            { title: "무현, 두 도시 이야기", rating: 0.5 }, { title: "부당거래", rating: 3.5 }, { title: "신세계", rating: 4.0 },
+            { title: "비상선언", rating: 1.5 }, { title: "올드보이", rating: 4.0 }, { title: "탑건: 매버릭", rating: 3.0 },
+            { title: "노인을 위한 나라는 없다", rating: 4.5 }, { title: "란 12.3", rating: 0.5 }, { title: "공작", rating: 3.5 },
+            { title: "헌트", rating: 4.0 }, { title: "리노의 도박사", rating: 4.0 }, { title: "뜨거운 오후", rating: 4.0 },
+            { title: "펀치 드렁크 러브", rating: 5.0 }, { title: "프로젝트 헤일메리", rating: 3.5 }, { title: "살목지", rating: 2.0 },
+            { title: "그랜드 부다페스트 호텔", rating: 4.5 }, { title: "파이트 클럽", rating: 2.5 }, { title: "시계태엽 오렌지", rating: 3.5 },
+            { title: "헤어질 결심", rating: 5.0 }, { title: "애국청년 변희재", rating: 2.5 }
+        ];
+
+        // --- 컴포넌트들 (ReviewInput, PasswordModal, DetailModal 등 위와 동일하게 구성) ---
+        // (지면 관계상 핵심 로직 위주로 구성하며 위 React 코드의 모든 기능을 포함함)
+
+        const IconBox = ({ children, className = "" }) => (
+            <div className={`inline-flex items-center justify-center ${className}`}>{children}</div>
+        );
+
+        const PasswordModal = ({ open, value, error, onChange, onSubmit, onClose }) => {
+            const inputRef = useRef(null);
+            useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 0); }, [open]);
+            if (!open) return null;
+            return (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4">
+                    <form onSubmit={onSubmit} className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-100 p-6">
+                        <div className="mb-4">
+                            <p className="text-[10px] text-indigo-600 font-black tracking-widest uppercase mb-1">비밀번호 확인</p>
+                            <h2 className="text-xl font-black text-slate-800">수정 권한이 필요합니다</h2>
+                        </div>
+                        <input ref={inputRef} type="password" value={value} onChange={(e) => onChange(e.target.value)} placeholder="비밀번호 입력" className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-indigo-200 focus:bg-white rounded-xl outline-none text-sm font-bold text-slate-700" />
+                        {error && <p className="mt-2 text-xs font-bold text-red-500">{error}</p>}
+                        <div className="flex justify-end gap-2 mt-5">
+                            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm">취소</button>
+                            <button type="submit" className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg">확인</button>
+                        </div>
+                    </form>
+                </div>
+            );
+        };
+
+        const ReviewInput = ({ initialValue, onSave, requestPassword }) => {
+            const [localValue, setLocalValue] = useState(initialValue || "");
+            const [isSaved, setIsSaved] = useState(false);
+            const [canEdit, setCanEdit] = useState(false);
+            const inputRef = useRef(null);
+            useEffect(() => { setLocalValue(initialValue || ""); setCanEdit(false); }, [initialValue]);
+            const handleFocus = (e) => { if (canEdit) return; e.target.blur(); requestPassword(() => { setCanEdit(true); setTimeout(() => inputRef.current?.focus(), 0); }); };
+            const handleBlur = () => { if (localValue !== initialValue) { onSave(localValue); setIsSaved(true); setTimeout(() => setIsSaved(false), 2000); } setCanEdit(false); };
+            return (
+                <div className="flex-1 relative group/input">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">💬</div>
+                    <input ref={inputRef} type="text" value={localValue} onFocus={handleFocus} onChange={(e) => setLocalValue(e.target.value)} onBlur={handleBlur} onKeyDown={(e) => e.key === 'Enter' && e.target.blur()} placeholder="한줄평..." className="w-full pl-12 pr-20 py-3 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-xl text-sm outline-none font-medium text-slate-600" />
+                    {isSaved && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-[10px]">✓ 저장됨</div>}
+                </div>
+            );
+        };
+
+        const RatingBarChart = ({ movies }) => {
+            const chartData = useMemo(() => {
+                const ratings = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+                const counts = ratings.map((rating) => ({ rating, count: movies.filter((m) => Number(m.rating) === rating).length }));
+                const maxCount = Math.max(1, ...counts.map(i => i.count));
+                return { counts, maxCount };
+            }, [movies]);
+            return (
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                    <h2 className="font-black text-slate-800 text-base mb-4">별점 분포</h2>
+                    <div className="space-y-2">
+                        {chartData.counts.map((item) => (
+                            <div key={item.rating} className="grid grid-cols-[42px_1fr_32px] items-center gap-3">
+                                <div className="text-xs font-black text-slate-500 text-right">{item.rating.toFixed(1)}</div>
+                                <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.max(4, (item.count / chartData.maxCount) * 100)}%` }}></div>
+                                </div>
+                                <div className="text-xs font-bold text-slate-400">{item.count}편</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const DetailModal = ({ movie, onClose, onSave }) => {
+            const [detailText, setDetailText] = useState(movie?.detailedReview || "");
+            const [isSaved, setIsSaved] = useState(false);
+            useEffect(() => { setDetailText(movie?.detailedReview || ""); setIsSaved(false); }, [movie]);
+            if (!movie) return null;
+            const handleSave = () => { onSave(movie.id, detailText); setIsSaved(true); setTimeout(() => setIsSaved(false), 2000); };
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 text-left">
+                    <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6">
+                        <div className="flex justify-between items-start mb-4">
+                            <h2 className="text-xl font-black">{movie.title} - 상세 리뷰</h2>
+                            <button onClick={onClose} className="text-2xl font-black">×</button>
+                        </div>
+                        <textarea value={detailText} onChange={(e) => setDetailText(e.target.value)} className="w-full h-64 p-4 bg-slate-50 rounded-2xl outline-none resize-none" />
+                        <div className="flex justify-between items-center mt-4">
+                            <span className="text-xs text-slate-400">{detailText.length}자 {isSaved && "✓ 저장됨"}</span>
+                            <div className="flex gap-2">
+                                <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-xl font-bold">닫기</button>
+                                <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg">저장</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [movies, setMovies] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState("");
+            const [sortOrder, setSortOrder] = useState('desc');
+            const [newTitle, setNewTitle] = useState("");
+            const [newRating, setNewRating] = useState(3.0);
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [selectedMovieId, setSelectedMovieId] = useState(null);
+            const [passwordAction, setPasswordAction] = useState(null);
+            const [passwordInput, setPasswordInput] = useState("");
+            const [passwordError, setPasswordError] = useState("");
+
+            useEffect(() => {
+                signInAnonymously(auth);
+                const unsubscribeAuth = onAuthStateChanged(auth, setUser);
+                return () => unsubscribeAuth();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const moviesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'movies');
+                return onSnapshot(query(moviesCollection), (snapshot) => {
+                    const movieList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    if (movieList.length === 0 && loading) {
+                        seedInitialData();
+                    } else {
+                        setMovies(movieList);
+                        setLoading(false);
+                    }
+                });
+            }, [user]);
+
+            const seedInitialData = async () => {
+                const moviesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'movies');
+                const batch = writeBatch(db);
+                initialMoviesData.forEach((movie, index) => {
+                    const docId = `movie_${index}_${Date.now()}`;
+                    batch.set(doc(moviesCollection, docId), { title: movie.title, rating: movie.rating, review: "", detailedReview: "", createdAt: Date.now() + index });
+                });
+                await batch.commit();
+            };
+
+            const submitPassword = (e) => {
+                e.preventDefault();
+                if (passwordInput === EDIT_PASSWORD) {
+                    const action = passwordAction;
+                    setPasswordAction(null); setPasswordInput(""); setPasswordError("");
+                    if (action) action();
+                } else { setPasswordError("틀렸습니다."); }
+            };
+
+            const handleAddMovie = async (e) => {
+                e.preventDefault();
+                if (!newTitle.trim()) return;
+                const docId = `movie_${Date.now()}`;
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', docId), { title: newTitle.trim(), rating: parseFloat(newRating), review: "", detailedReview: "", createdAt: Date.now() });
+                setNewTitle(""); setNewRating(3.0); setShowAddForm(false);
+            };
+
+            const handleDeleteMovie = (id) => setPasswordAction(() => async () => {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id));
+            });
+
+            const handleReviewSave = async (id, text) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id), { review: text });
+            const handleDetailSave = async (id, text) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id), { detailedReview: text });
+
+            const filteredMovies = useMemo(() => [...movies].filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => sortOrder === 'desc' ? b.rating - a.rating : a.rating - b.rating), [movies, searchTerm, sortOrder]);
+            const selectedMovie = useMemo(() => movies.find(m => m.id === selectedMovieId) || null, [movies, selectedMovieId]);
+
+            if (loading) return <div className="h-screen flex items-center justify-center font-bold text-slate-400">데이터 로딩 중...</div>;
+
+            return (
+                <div className="max-w-4xl mx-auto p-4 md:p-8">
+                    <header className="mb-8 flex justify-between items-center">
+                        <h1 className="text-3xl font-black text-slate-800">🎬 나만의 영화 보관함</h1>
+                        <button onClick={() => setPasswordAction(() => () => setShowAddForm(!showAddForm))} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg">추가</button>
+                    </header>
+
+                    <RatingBarChart movies={movies} />
+
+                    {showAddForm && (
+                        <div className="bg-white p-6 rounded-2xl shadow-xl mb-8">
+                            <form onSubmit={handleAddMovie} className="flex gap-4">
+                                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="제목" className="flex-1 p-3 bg-slate-50 rounded-xl outline-none" />
+                                <input type="range" min="0.5" max="5" step="0.5" value={newRating} onChange={e => setNewRating(e.target.value)} />
+                                <button type="submit" className="bg-slate-800 text-white px-4 py-2 rounded-xl">추가</button>
+                            </form>
+                        </div>
+                    )}
+
+                    <div className="mb-6 flex gap-4">
+                        <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="검색..." className="flex-1 p-3 bg-white border border-slate-200 rounded-2xl outline-none shadow-sm" />
+                        <button onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} className="px-4 py-2 bg-white rounded-2xl font-bold border">↕ {sortOrder === 'desc' ? '높은순' : '낮은순'}</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {filteredMovies.map(movie => (
+                            <div key={movie.id} className="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4 group">
+                                <div className="w-1/4">
+                                    <h3 className="font-bold truncate">{movie.title}</h3>
+                                    <div className="text-yellow-400">★ {Number(movie.rating).toFixed(1)}</div>
+                                </div>
+                                <ReviewInput initialValue={movie.review} onSave={text => handleReviewSave(movie.id, text)} requestPassword={a => setPasswordAction(() => a)} />
+                                <button onClick={() => setPasswordAction(() => () => setSelectedMovieId(movie.id))} className={`px-4 py-2 rounded-xl text-xs font-black border ${movie.detailedReview ? 'bg-indigo-50 text-indigo-600' : 'bg-white text-slate-400'}`}>상세 리뷰</button>
+                                <button onClick={() => handleDeleteMovie(movie.id)} className="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all text-xl">🗑</button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <DetailModal movie={selectedMovie} onClose={() => setSelectedMovieId(null)} onSave={handleDetailSave} />
+                    <PasswordModal open={Boolean(passwordAction)} value={passwordInput} error={passwordError} onChange={setPasswordInput} onSubmit={submitPassword} onClose={() => setPasswordAction(null)} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
