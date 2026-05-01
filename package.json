@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "build": "echo no build needed"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
