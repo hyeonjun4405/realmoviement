@@ -12,6 +12,17 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+const headers = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Access-Control-Allow-Origin": "*",
+
+  // 캐시 방지
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+  "Surrogate-Control": "no-store",
+};
+
 exports.handler = async function () {
   try {
     const snapshot = await db
@@ -27,30 +38,54 @@ exports.handler = async function () {
 
       return {
         id: doc.id,
+
         title: data.title ?? data.name ?? "",
         rating: data.rating ?? data.score ?? null,
-        oneLine: data.review ?? data.shortReview ?? data.comment ?? "",
-        detailedreview: data.review11 ?? data.detailedReview ?? "",
+
+        oneLine:
+          data.oneLine ??
+          data.review ??
+          data.comment ??
+          data.reviewText ??
+          "",
+
+        detailedreview:
+          data.detailedreview ??
+          data.detailedReview ??
+          data.detailReview ??
+          "",
+
+
+        // 임시 확인용: 실제 Firestore 원본 필드
+        raw: data,
       };
     });
 
     return {
       statusCode: 200,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-      },
-      body: JSON.stringify(movies, null, 2),
+      headers,
+      body: JSON.stringify(
+        {
+          fetchedAt: new Date().toISOString(),
+          count: movies.length,
+          movies,
+        },
+        null,
+        2
+      ),
     };
   } catch (error) {
     return {
       statusCode: 500,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-      },
-      body: JSON.stringify({
-        error: error.message,
-      }),
+      headers,
+      body: JSON.stringify(
+        {
+          fetchedAt: new Date().toISOString(),
+          error: error.message,
+        },
+        null,
+        2
+      ),
     };
   }
 };
