@@ -124,7 +124,6 @@
             useEffect(() => { setLocalValue(initialValue || ""); setCanEdit(false); }, [initialValue]);
 
             const handleMouseEnter = () => {
-                // 1초 이상 머물 때 툴팁 표시
                 if (localValue && !canEdit) {
                     hoverTimeout.current = setTimeout(() => {
                         setShowTooltip(true);
@@ -142,7 +141,7 @@
                 e.target.blur();
                 requestPassword(() => {
                     setCanEdit(true);
-                    setShowTooltip(false); // 수정 중엔 툴팁 숨김
+                    setShowTooltip(false);
                     setTimeout(() => inputRef.current?.focus(), 0);
                 });
             };
@@ -175,9 +174,8 @@
                         className="w-full pl-12 pr-20 py-3 bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white rounded-xl text-sm outline-none font-medium text-slate-600 overflow-hidden text-ellipsis" 
                     />
                     
-                    {/* 1초 호버 시 나타나는 툴팁 */}
                     {showTooltip && (
-                        <div className="absolute bottom-full left-0 mb-3 w-full z-[60] animate-tooltip">
+                        <div className="absolute bottom-full left-0 mb-3 w-full z-[60] animate-tooltip pointer-events-none">
                             <div className="bg-slate-800 text-white text-xs p-3 rounded-xl shadow-2xl border border-slate-700 leading-relaxed break-all">
                                 {localValue}
                             </div>
@@ -244,42 +242,71 @@
         // --- 0.5점 단위 별점 선택 컴포넌트 ---
         const StarRatingInput = ({ value, onChange }) => {
             const [hover, setHover] = useState(0);
-
             const displayValue = hover || value;
 
             return (
                 <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((index) => (
                         <div key={index} className="star-container text-2xl relative">
-                            {/* Base Empty Star */}
                             <span className="text-slate-200">★</span>
-                            
-                            {/* Filled Star Overlay */}
                             <div 
                                 className="absolute top-0 left-0 overflow-hidden text-yellow-400 transition-all pointer-events-none"
                                 style={{ width: displayValue >= index ? '100%' : displayValue >= index - 0.5 ? '50%' : '0%' }}
                             >
                                 <span>★</span>
                             </div>
-
-                            {/* Left Half Hover/Click Area */}
-                            <div 
-                                className="star-half star-left" 
-                                onMouseEnter={() => setHover(index - 0.5)}
-                                onMouseLeave={() => setHover(0)}
-                                onClick={() => onChange(index - 0.5)}
-                            />
-                            
-                            {/* Right Half Hover/Click Area */}
-                            <div 
-                                className="star-half star-right" 
-                                onMouseEnter={() => setHover(index)}
-                                onMouseLeave={() => setHover(0)}
-                                onClick={() => onChange(index)}
-                            />
+                            <div className="star-half star-left" onMouseEnter={() => setHover(index - 0.5)} onMouseLeave={() => setHover(0)} onClick={() => onChange(index - 0.5)} />
+                            <div className="star-half star-right" onMouseEnter={() => setHover(index)} onMouseLeave={() => setHover(0)} onClick={() => onChange(index)} />
                         </div>
                     ))}
                     <span className="ml-2 text-sm font-black text-slate-400 min-w-[24px]">{value.toFixed(1)}</span>
+                </div>
+            );
+        };
+
+        // --- 별점 표시 컴포넌트 ---
+        const RatingStarsDisplay = ({ rating }) => (
+            <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((index) => (
+                    <div key={index} className="relative text-base">
+                        <span className="text-gray-300">★</span>
+                        <div 
+                            className="absolute top-0 left-0 overflow-hidden text-yellow-400"
+                            style={{ width: rating >= index ? '100%' : rating >= index - 0.5 ? '50%' : '0%' }}
+                        >
+                            <span>★</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+
+        // --- 수정 가능한 평점 컴포넌트 ---
+        const EditableRating = ({ value, onSave, requestPassword }) => {
+            const [isEditing, setIsEditing] = useState(false);
+
+            if (isEditing) {
+                return (
+                    <div onMouseLeave={() => setIsEditing(false)} className="bg-white px-2 py-1 rounded-lg border border-indigo-100 shadow-sm animate-tooltip">
+                        <StarRatingInput 
+                            value={value} 
+                            onChange={(newVal) => {
+                                onSave(newVal);
+                                setIsEditing(false);
+                            }} 
+                        />
+                    </div>
+                );
+            }
+
+            return (
+                <div 
+                    onClick={() => requestPassword(() => setIsEditing(true))}
+                    className="cursor-pointer hover:bg-yellow-50 p-1 rounded-lg transition-all flex items-center gap-2 group/stars"
+                    title="클릭하여 평점 수정"
+                >
+                    <RatingStarsDisplay rating={value} />
+                    <span className="text-xs font-black text-slate-400 group-hover/stars:text-indigo-600">{value.toFixed(1)}</span>
                 </div>
             );
         };
@@ -351,25 +378,14 @@
 
             const handleReviewSave = async (id, text) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id), { review: text });
             const handleDetailSave = async (id, text) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id), { detailedReview: text });
+            
+            // 평점 직접 수정 핸들러
+            const handleRatingSave = async (id, newRating) => {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'movies', id), { rating: newRating });
+            };
 
             const filteredMovies = useMemo(() => [...movies].filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => sortOrder === 'desc' ? b.rating - a.rating : a.rating - b.rating), [movies, searchTerm, sortOrder]);
             const selectedMovie = useMemo(() => movies.find(m => m.id === selectedMovieId) || null, [movies, selectedMovieId]);
-
-            const RatingStarsDisplay = ({ rating }) => (
-                <div className="flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map((index) => (
-                        <div key={index} className="relative text-base">
-                            <span className="text-gray-300">★</span>
-                            <div 
-                                className="absolute top-0 left-0 overflow-hidden text-yellow-400"
-                                style={{ width: rating >= index ? '100%' : rating >= index - 0.5 ? '50%' : '0%' }}
-                            >
-                                <span>★</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            );
 
             if (loading) return <div className="h-screen flex items-center justify-center font-bold text-slate-400">데이터 로딩 중...</div>;
 
@@ -377,7 +393,7 @@
                 <div className="max-w-4xl mx-auto p-4 md:p-8">
                     <header className="mb-8 flex justify-between items-center">
                         <h1 className="text-3xl font-black text-slate-800">🎬 나만의 영화 보관함</h1>
-                        <button onClick={() => setPasswordAction(() => () => setShowAddForm(!showAddForm))} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg">추가</button>
+                        <button onClick={() => setPasswordAction(() => () => setShowAddForm(!showAddForm))} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all active:scale-95">추가</button>
                     </header>
 
                     <RatingBarChart movies={movies} />
@@ -398,30 +414,33 @@
                     <div className="mb-6 flex gap-4">
                         <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⌕</span>
-                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="제목 검색..." className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none shadow-sm" />
+                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="제목 검색..." className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none shadow-sm text-sm" />
                         </div>
-                        <button onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} className="px-4 py-2 bg-white rounded-2xl font-bold border">↕ {sortOrder === 'desc' ? '높은순' : '낮은순'}</button>
+                        <button onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} className="px-5 py-3 bg-white rounded-2xl font-bold border border-slate-200 shadow-sm whitespace-nowrap">↕ {sortOrder === 'desc' ? '높은순' : '낮은순'}</button>
                     </div>
 
                     <div className="space-y-4">
                         {filteredMovies.map(movie => (
-                            <div key={movie.id} className="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4 group hover:border-indigo-100 transition-all">
-                                <div className="w-1/4">
-                                    <h3 className="font-bold truncate">{movie.title}</h3>
-                                    <div className="flex items-center gap-2">
-                                        <RatingStarsDisplay rating={Number(movie.rating)} />
-                                        <span className="text-xs font-black text-slate-400">{Number(movie.rating).toFixed(1)}</span>
-                                    </div>
+                            <div key={movie.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-start md:items-center gap-4 group hover:border-indigo-200 transition-all">
+                                <div className="w-full md:w-1/4">
+                                    <h3 className="font-bold truncate text-slate-800">{movie.title}</h3>
+                                    <EditableRating 
+                                        value={Number(movie.rating)} 
+                                        onSave={(newVal) => handleRatingSave(movie.id, newVal)} 
+                                        requestPassword={requestPassword} 
+                                    />
                                 </div>
                                 <ReviewInput initialValue={movie.review} onSave={text => handleReviewSave(movie.id, text)} requestPassword={a => setPasswordAction(() => a)} />
-                                <button onClick={() => setPasswordAction(() => () => setSelectedMovieId(movie.id))} className={`px-4 py-2 rounded-xl text-xs font-black border ${movie.detailedReview ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-white text-slate-400'}`}>상세 리뷰</button>
-                                <button onClick={() => handleDeleteMovie(movie.id)} className="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all text-xl">🗑</button>
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <button onClick={() => setPasswordAction(() => () => setSelectedMovieId(movie.id))} className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-black border transition-all ${movie.detailedReview ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-200'}`}>상세 리뷰</button>
+                                    <button onClick={() => handleDeleteMovie(movie.id)} className="p-2 text-slate-200 hover:text-red-500 transition-all text-xl">🗑</button>
+                                </div>
                             </div>
                         ))}
                     </div>
 
                     <div className="mt-12 text-center text-slate-300 text-[10px] font-bold uppercase tracking-widest pb-8">
-                        마우스를 한줄평에 1초간 올리면 전체 내용을 볼 수 있습니다.
+                        평점을 클릭하여 수정할 수 있으며, 마우스를 한줄평에 1초간 올리면 전체 내용을 볼 수 있습니다.
                     </div>
 
                     <DetailModal movie={selectedMovie} onClose={() => setSelectedMovieId(null)} onSave={handleDetailSave} />
